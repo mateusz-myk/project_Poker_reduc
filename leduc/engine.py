@@ -1,0 +1,146 @@
+"""Sequential three-player Leduc Poker engine."""
+from __future__ import annotations
+import copy, json, random
+from fractions import Fraction
+from dataclasses import dataclass
+from typing import Protocol
+
+@dataclass(frozen=True)
+class Card:
+    rank: int
+    suit: int
+
+@dataclass(frozen=True)
+class Observation:
+    player_id: int
+    private_card: Card
+    community_card: Card | None
+    pot: int
+    contributions: tuple[int, ...]
+    folded: tuple[bool, ...]
+    round_number: int
+    history: tuple[tuple[int, str, int], ...]
+    current_player: int
+
+class Agent(Protocol):
+    def act(self, observation: Observation, legal_actions: tuple[str, ...]) -> str: ...
+
+class GameEngine:
+    def __init__(self, seed: int = 0, n_players: int = 3, n_ranks: int = 3, n_suits: int = 3):
+        self.reset(seed, n_players, n_ranks, n_suits)
+
+    def reset(self, seed: int = 0, n_players: int = 3, n_ranks: int = 3, n_suits: int = 3):
+        if not 2 <= n_players <= 8 or n_ranks < 1 or n_suits < 1 or n_players + 1 > n_ranks*n_suits:
+            raise ValueError("invalid player or deck configuration")
+        self.seed, self.n_players, self.n_ranks, self.n_suits = int(seed), n_players, n_ranks, n_suits
+        self.rng = random.Random(self.seed)
+        self.deck = [Card(r, s) for r in range(n_ranks) for s in range(n_suits)]
+        self.rng.shuffle(self.deck)
+        self.private_cards = self.deck[:n_players]
+        self.community_card = None
+        self._hidden_community = self.deck[n_players]
+        self.contributions = [1] * n_players
+        self.pot = n_players
+        self.folded = [False] * n_players
+        self.round_number = 1
+        self.bet_size = 2
+        self.raises = 0
+        self.acted: set[int] = set()
+        self.current = 0
+        self.history: list[tuple[int,str,int]] = []
+        self.done = False
+        self._payoffs: tuple[Fraction,...] | None = None
+        self.log = {"version":1,"seed":self.seed,"n_players":n_players,"n_ranks":n_ranks,"n_suits":n_suits,"actions":[]}
+        return self.observe(0)
+
+    def copy(self): return copy.deepcopy(self)
+    def current_player(self): return None if self.done else self.current
+    def is_terminal(self): return self.done
+    def payoffs(self): return self._payoffs if self.done else None
+    def payoffs_float(self):
+        """Return terminal payoffs as floats for consumers that require them."""
+        return None if self._payoffs is None else tuple(float(value) for value in self._payoffs)
+
+    def legal_actions(self, player_id: int):
+        self._check_turn(player_id)
+        max_paid = max(self.contributions[i] for i in range(self.n_players) if not self.folded[i])
+        owed = self.contributions[player_id] < max_paid
+        actions = ["call"]
+        if owed: actions.insert(0,"fold")
+        if self.raises < 2: actions.append("raise")
+        return tuple(actions)
+
+    def observe(self, player_id: int):
+        self._check_player(player_id)
+        return Observation(player_id,self.private_cards[player_id],self.community_card,self.pot,tuple(self.contributions),tuple(self.folded),self.round_number,tuple(self.history),self.current)
+
+    def step(self, action: str):
+        if self.done: raise RuntimeError("game is already finished")
+        p=self.current
+        if action not in self.legal_actions(p): raise ValueError(f"illegal action {action!r}")
+        self.log["actions"].append(action)
+        self.history.append((p,action,self.contributions[p]))
+        if action == "fold": self.folded[p]=True
+        elif action == "call":
+            max_paid=max(self.contributions[i] for i in range(self.n_players) if not self.folded[i])
+            amount=max_paid-self.contributions[p]
+            self.contributions[p]+=amount; self.pot+=amount
+        else:
+            max_paid=max(self.contributions[i] for i in range(self.n_players) if not self.folded[i])
+            amount=max_paid-self.contributions[p]+self.bet_size
+            self.contributions[p]+=amount; self.pot+=amount
+            self.raises+=1
+            self.acted={p}
+        self.acted.add(p)
+        active=[i for i in range(self.n_players) if not self.folded[i]]
+        if len(active)==1: self._finish((active[0],)); return self.observe(p)
+        max_paid=max(self.contributions[i] for i in active)
+        if set(active).issubset(self.acted) and all(self.contributions[i]==max_paid for i in active):
+            if self.round_number==1:
+                self.round_number=2; self.bet_size=4; self.raises=0; self.acted=set()
+                self.community_card=self._hidden_community
+                self.current=min(active)
+                return self.observe(p)
+            self._finish(self._showdown_winners(active)); return self.observe(p)
+        self.current=self._next(active)
+        return self.observe(p)
+
+    def _next(self, active):
+        for n in range(1,self.n_players+1):
+            i=(self.current+n)%self.n_players
+            if i in active and i not in self.acted: return i
+        for n in range(1,self.n_players+1):
+            i=(self.current+n)%self.n_players
+            if i in active: return i
+        raise RuntimeError("no active player")
+
+    def _showdown_winners(self, active):
+        def score(i):
+            pair=self.private_cards[i].rank==self.community_card.rank
+            return (int(pair),self.private_cards[i].rank)
+        best=max(score(i) for i in active)
+        return tuple(i for i in active if score(i)==best)
+
+    def _finish(self, winners):
+        shares=[Fraction(0) for _ in range(self.n_players)]
+        share=Fraction(self.pot,len(winners))
+        for i in winners: shares[i]=share
+        self._payoffs=tuple(shares[i]-self.contributions[i] for i in range(self.n_players))
+        assert sum(self._payoffs,Fraction(0))==0
+        self.done=True
+    def _check_player(self,p):
+        if not isinstance(p,int) or not 0<=p<self.n_players: raise ValueError("invalid player id")
+    def _check_turn(self,p):
+        self._check_player(p)
+        if self.done or p!=self.current: raise ValueError("not this player's turn")
+
+    def to_json(self): return json.dumps(self.log,sort_keys=True,separators=(",",":"))
+    @classmethod
+    def replay_json(cls,payload):
+        data=json.loads(payload); game=cls(data["seed"],data["n_players"],data["n_ranks"],data["n_suits"])
+        for action in data["actions"]: game.step(action)
+        return game
+
+
+
+
