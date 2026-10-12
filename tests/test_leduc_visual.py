@@ -18,7 +18,7 @@ def test_render_cards_symbols_and_alignment():
     assert unicodedata.east_asian_width("♢")=="N"
 
 def test_table_privacy_and_widths():
-    for n in (2,3,5,8):
+    for n in (2,3):
         for mode in (False,True):
             g=GameEngine(10,n_players=n)
             table=render_table(g.observe(0),n,g.bet_size,mode,game=g)

@@ -32,8 +32,18 @@ def test_zero_sum_and_privacy():
 def test_smoke_1000():
     rng=random.Random(91)
     for seed in range(1000):
-        g=GameEngine(seed,n_players=2+seed%4)
+        g=GameEngine(seed,n_players=2+seed%2)
         while not g.is_terminal():
             p=g.current_player(); g.step(rng.choice(g.legal_actions(p)))
             assert g.pot==sum(g.contributions)
         assert sum(g.payoffs())==0
+
+
+def test_player_count_must_be_two_or_three():
+    for n_players in (1, 4, 8):
+        try:
+            GameEngine(seed=0, n_players=n_players)
+        except ValueError as error:
+            assert "n_players must be 2 or 3" in str(error)
+        else:
+            raise AssertionError(f"n_players={n_players} should be rejected")

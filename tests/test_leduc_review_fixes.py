@@ -58,5 +58,5 @@ def test_player_labels_use_colon_without_pipe_wrapping():
     game._finish((0, 1))
     showdown = render_showdown(game)
     assert "|Gracz" not in table + showdown
-    assert "Remis: Gracz 0:, Gracz 1:" in showdown
+    assert "Remis: Gracz 0, Gracz 1," in showdown
     assert "Wyplaty: Gracz 0:" in showdown

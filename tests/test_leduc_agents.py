@@ -17,7 +17,7 @@ def _finish_randomly(game, seed):
 
 
 def test_determinize_preserves_observation_privacy_and_card_uniqueness():
-    for n_players in (2, 3, 4):
+    for n_players in (2, 3):
         for seed in range(20):
             game = GameEngine(seed, n_players)
             rng = random.Random(seed * 100 + n_players)

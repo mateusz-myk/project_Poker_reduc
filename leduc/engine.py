@@ -1,4 +1,4 @@
-"""Sequential three-player Leduc Poker engine."""
+"""Sequential Leduc Poker engine for two or three players."""
 from __future__ import annotations
 import copy, json, random
 from fractions import Fraction
@@ -38,8 +38,10 @@ class GameEngine:
         self.reset(seed, n_players, n_ranks, n_suits)
 
     def reset(self, seed: int = 0, n_players: int = 3, n_ranks: int = 3, n_suits: int = 3):
-        if not 2 <= n_players <= 8 or n_ranks < 1 or n_suits < 1 or n_players + 1 > n_ranks*n_suits:
-            raise ValueError("invalid player or deck configuration")
+        if n_players not in (2, 3):
+            raise ValueError("n_players must be 2 or 3")
+        if n_ranks < 1 or n_suits < 1 or n_players + 1 > n_ranks*n_suits:
+            raise ValueError("invalid deck configuration")
         self.seed, self.n_players, self.n_ranks, self.n_suits = int(seed), n_players, n_ranks, n_suits
         self.rng = random.Random(self.seed)
         self.deck = [Card(r, s) for r in range(n_ranks) for s in range(n_suits)]
@@ -116,7 +118,7 @@ class GameEngine:
     def determinize(cls, obs: Observation, rng: random.Random, n_ranks: int = 3, n_suits: int = 3, public_progress=None):
         """Build a sampled full state consistent with a public observation."""
         n = len(obs.contributions)
-        if not 2 <= n <= 8 or n + 1 > n_ranks * n_suits:
+        if n not in (2, 3) or n + 1 > n_ranks * n_suits:
             raise ValueError("invalid player or deck configuration")
         known = [obs.private_card]
         if obs.community_card is not None:
