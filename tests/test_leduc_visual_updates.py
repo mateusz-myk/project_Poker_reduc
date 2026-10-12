@@ -19,7 +19,7 @@ def test_zero_bet_is_called_check_in_history_and_prompt():
     g=GameEngine(3,n_players=2)
     g.step("call")
     view=render_table(g.observe(1),2,g.bet_size,game=g)
-    assert "G0 check" in view
+    assert "Gracz 0: check" in view
     assert "Do wyrownania: 0 zetonow (mozesz czekac)" in view
     assert "call = check" not in view
 

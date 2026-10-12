@@ -43,7 +43,7 @@ def _wrapped_history(game: GameEngine):
     if not records: return ["  (brak akcji)"]
     output=[]
     for rnd in (1,2):
-        items=[f"G{p} {action}" for r,p,action,_ in records if r==rnd]
+        items=[f"Gracz {p}: {action}" for r,p,action,_ in records if r==rnd]
         if not items: continue
         line=f"  R{rnd}: "
         for item in items:
@@ -61,7 +61,7 @@ def render_table(obs: Observation, n_players: int, bet_size: int, unicode=False,
     header=f" LEDUC | R{obs.round_number}/2 | Bet {bet_size} | Pula {obs.pot} | Podbicia: {raises}/2"
     lines=["="*SCREEN_WIDTH,header,"="*SCREEN_WIDTH," KARTA WSPOLNA          TWOJA KARTA (Gracz "+str(obs.player_id)+")"]
     lines.extend(" "+a+"                "+b for a,b in zip(common,own))
-    lines += ["-"*SCREEN_WIDTH," Gr  Wplacono  Status    Karta"]
+    lines += ["-"*SCREEN_WIDTH," Gracz      Wplacono  Status    Karta"]
     for i in range(n_players):
         mark=">" if i==obs.current_player else " "
         status="FOLD" if obs.folded[i] else "aktywny"
@@ -69,7 +69,7 @@ def render_table(obs: Observation, n_players: int, bet_size: int, unicode=False,
         elif obs.folded[i]: shown="[--]"
         elif i==obs.player_id: shown=compact_card(obs.private_card,unicode)
         else: shown="[??]"
-        lines.append(f"{mark} {i:<2} {obs.contributions[i]:>6}    {status:<8}  {shown}")
+        lines.append(f"{mark} Gracz {i}: {obs.contributions[i]:>6}    {status:<8}  {shown}")
     lines.append("-"*SCREEN_WIDTH); lines.append(" Historia:")
     lines.extend(_wrapped_history(game) if game is not None else ["  Historia niedostepnia"])
     lines.append("-"*SCREEN_WIDTH)
@@ -92,29 +92,29 @@ def _format_payoff(value):
     return sign+(str(amount.numerator) if amount.denominator==1 else f"{amount.numerator}/{amount.denominator}")
 
 def _payout_line(paid):
-    payout="Wyplaty: "+", ".join(f"Gracz {i} {_format_payoff(v)}" for i,v in enumerate(paid))
+    payout="Wyplaty: "+", ".join(f"Gracz {i}: {_format_payoff(v)}" for i,v in enumerate(paid))
     return textwrap.wrap(payout,width=SCREEN_WIDTH,subsequent_indent="  ")
 def render_showdown(game: GameEngine, unicode=False, debug=False):
     paid=game.payoffs(); active=[i for i in range(game.n_players) if not game.folded[i]]
     lines=["SHOWDOWN"]
     if len(active)==1:
-        lines += ["Koniec po foldzie",f"Wygrywa: Gracz {active[0]}","Suma wyplat: "+str(sum(paid))]
+        lines += ["Koniec po foldzie",f"Wygrywa: Gracz {active[0]}:","Suma wyplat: "+str(sum(paid))]
         lines.extend(_payout_line(paid))
         return '\n'.join(lines)
     lines.append("Karta wspolna: "+compact_card(game.community_card,unicode))
     best=max((int(game.private_cards[i].rank==game.community_card.rank),game.private_cards[i].rank) for i in active)
     winners=[i for i in active if (int(game.private_cards[i].rank==game.community_card.rank),game.private_cards[i].rank)==best]
-    lines.append("Remis: "+", ".join(f"Gracz {i}" for i in winners)+", podzial puli po rowno" if len(winners)>1 else f"Wygrywa: Gracz {winners[0]}")
+    lines.append("Remis: "+", ".join(f"Gracz {i}:" for i in winners)+", podzial puli po rowno" if len(winners)>1 else f"Wygrywa: Gracz {winners[0]}:")
     for i in range(game.n_players):
         if game.folded[i] and not debug:
-            lines.append(f"G{i} FOLD{'':24}{_format_payoff(paid[i])}"); continue
+            lines.append(f"Gracz {i}: FOLD{'':21}{_format_payoff(paid[i])}"); continue
         if game.folded[i]:
-            lines.append(f"G{i} FOLD {compact_card(game.private_cards[i],unicode):<7}{_format_payoff(paid[i])}"); continue
+            lines.append(f"Gracz {i}: FOLD {compact_card(game.private_cards[i],unicode):<7}{_format_payoff(paid[i])}"); continue
         card=compact_card(game.private_cards[i],unicode)
         pair=game.private_cards[i].rank==game.community_card.rank
         detail=f"{'PARA' if pair else 'wysoka karta'} ({rank_symbol(game.private_cards[i].rank)})"
         label=("REMIS" if len(winners)>1 else "WYGRYWA") if i in winners else ""
-        lines.append(f"G{i} {card:<6} {detail:<20} {label:<9} {_format_payoff(paid[i])}")
+        lines.append(f"Gracz {i}: {card:<6} {detail:<20} {label:<9} {_format_payoff(paid[i])}")
     lines.append("Suma wyplat: "+str(sum(paid)))
     lines.extend(_payout_line(paid))
     return '\n'.join(lines)

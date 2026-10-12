@@ -34,8 +34,8 @@ def test_tie_showdown_says_split_and_formats_fractions():
     game.pot=3; game.contributions=[1,1,1]
     game._finish((0,1))
     view=render_showdown(game)
-    assert "Remis: Gracz 0, Gracz 1, podzial puli po rowno" in view
+    assert "Remis: Gracz 0:, Gracz 1:, podzial puli po rowno" in view
     assert "REMIS" in view and "WYGRYWA" not in view
-    assert "Gracz 0 +1/2" in view and "Gracz 1 +1/2" in view
+    assert "Gracz 0: +1/2" in view and "Gracz 1: +1/2" in view
     assert "Suma wyplat: 0" in view
 
